@@ -2,7 +2,7 @@
   "name": "r6info",
   "version": "1.0.0",
   "description": "A wrapper for both the Ubisoft and Tabstats API with the intent of fetching detailed statistics.",
-  "main": "test.js",
+  "main": "api.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -15,75 +15,23 @@
     "node",
     "javascript",
     "js",
-		"ubisoft",
-		"tabstats",
-	],
+    "ubisoft",
+    "tabstats"
+  ],
   "author": "boltr6",
   "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/boltr6/r6info/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/boltr6/r6info.git"
+  },
+  "homepage": "https://github.com/boltr6/r6info#readme",
   "dependencies": {
-    "node": "^15.3.0"
+    "node": "^15.3.0",
     "node-fetch": "^3.3.0",
     "r6api.js": "^4.4.1",
     "resemblejs": "^4.1.0"
   }
 }
-"name": "@vince144/r6-api",
-
-  "version": "2.2.2",
-
-  "description": "An api for fetching player statistics from Ubisoft's Rainbow Six website.",
-
-  "keywords": [
-
-    "rainbow-six-siege",
-
-    "r6",
-
-    "siege",
-
-    "rainbow6",
-
-    "api",
-
-    "node",
-
-    "javascript",
-
-    "js"
-
-  ],
-
-  "main": "api.js",
-
-  "scripts": {
-
-    "test": "echo \"Error: no test specified\" && exit 1"
-
-  },
-
-  "repository": {
-
-    "type": "git",
-
-    "url": "git+https://github.com/vince1444/r6-api.git"
-
-  },
-
-  "author": "vince1444",
-
-  "license": "ISC",
-
-  "bugs": {
-
-    "url": "https://github.com/vince1444/r6-api/issues"
-
-  },
-
-  "homepage": "https://github.com/vince1444/r6-api#readme",
-
-  "dependencies": {
-
-    "node": "^15.3.0"
-
-  }
-

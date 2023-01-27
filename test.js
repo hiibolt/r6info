@@ -1,4 +1,4 @@
-const r6info = require('./index.js');
+const r6info = require('r6info');
 
 // Create a Ubisoft authorization
 const api = r6info.generateAPIHook({ 
