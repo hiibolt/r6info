@@ -2,8 +2,8 @@ const r6info = require('r6info');
 
 // Create a Ubisoft authorization
 const api = r6info.generateAPIHook({ 
-	email: "johnwhite86113@gmail.com", 
-	password: "totank10",
+	email: "<your email here>", 
+	password: "<your password here>",
 });
 
 async function lookup(){
