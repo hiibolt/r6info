@@ -1,1 +1,1 @@
-entrypoint = "index.js"
+entrypoint = "test.js"

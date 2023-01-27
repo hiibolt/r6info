@@ -1,47 +1,134 @@
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 const R6API = require('r6api.js').default;
-const stats = require('rainbow-six-api');
-const readline = require("readline");
 const resemble = require("resemblejs");
-const rl = readline.createInterface({
-	input: process.stdin,
-	output: process.stdout
-});
-const email = "johnwhite86113@gmail.com";
-const password = process.env['password'];
-const r6api = new R6API({ email, password });
+const valid_seasons = ['Solar Raid','Brutal Swarm','Vector Glare','Demon Veil','High Calibre','Crystal Guard','North Star','Crimson Heist','Neon Dawn','Shadow Legacy','Steel Wave','Void Edge','Shifting Tides','Ember Rise','Phantom Sight'].map(i=>i.toLowerCase().replace(/\s/g,'-'));
 
-
-async function query(username, callback) {
-	const profile = {
-		username,
+function generateAPIHook(options){
+	return new R6API({ 
+		email: options.email, 
+		password: options.password 
+	});
+}
+R6API.prototype.calculateRating = async function(profile){
+	if(!profile){
+		throw new Error("Please pass a valid player object. You can create one via .hookPlayer().");
+	}
+	if(profile.verified){
+		return "This is a well known or verified player.";
+	}
+	if(profile.banned){
+		return "This player has already been banned.";
+	}
+	if(profile.score > 150){
+		return "Very likely a legitimate player.";
+	}
+	if(profile.score > 90){
+		return "Possible cheater or new player/account.";
+	}
+	if(profile.score > 50){
+		return "Definite cheater.";
+	}
+	if(profile.score <= 50){
+		return "Rage cheater/Server Hitter.";
+	}
+	throw new Error('Invalid player data');
+}
+R6API.prototype.hookPlayer = async function(options){
+	let invalid, value;
+	await this.findByUsername(options.platform, options.username).then((result) => {
+		if (result.length == 0) {
+			invalid = true;
+		}
+		value = result[0];
+	});
+	if (invalid) {
+		throw new Error("Provide a valid username and/or platform.");
+	}
+	return value;
+}
+R6API.prototype.findPlatforms = async function(player){
+	if(!player || !player.userId){
+		throw new Error("Please pass a valid hook object. You can create one via .hookPlayer().");
+	}
+	return await this.findById('all', player.userId, { 
+		isUserId: true 
+	});
+}
+R6API.prototype.getAllApplications = async function(player){
+	if(!player || !player.userId){
+		throw new Error("Please pass a valid hook object. You can create one via .hookPlayer().");
+	}
+	return (await this.getProfileApplications(player.userId, { 
+		isUserId: true 
+	}))[0];
+}
+R6API.prototype.getSmurfs = async function(player){
+	if(!player || !player.userId){
+		throw new Error("Please pass a valid hook object. You can create one via .hookPlayer().");
+	}
+	return await (await fetch('https://r6.apitab.net/website/profiles/'+player.userId+'/smurfs',	{
+		"Content-Type": "application/json"
+	}).catch(console.err))
+		.json();
+}
+R6API.prototype.getStatistics = async function(player){
+	if(!player || !player.userId){
+		throw new Error("Please pass a valid hook object. You can create one via .hookPlayer().");
+	}
+	return (await fetch('https://r6.apitab.net/website/profiles/'+player.userId,	{
+		"Content-Type": "application/json"
+	}).catch(console.err))
+		.json();
+}
+R6API.prototype.hasDefaultPFP = async function(player){
+	if(!player ||!player.avatar['256']){
+		throw new Error("Please pass a valid hook object. You can create one via.hookPlayer().");
+	}
+	return (await new Promise((resolve) => {
+		resemble('src/comp.png')
+		.compareTo(player.avatar['256'])
+		.ignoreColors()
+		.onComplete(resolve)})).rawMisMatchPercentage == 0;
+}
+//async function grabUbiProfile(generator,)
+R6API.prototype.generateSimpleProfile = async function(hook, options) {
+	let profile = {};
+	
+	/** Grab Ubisoft and Tabstats-provided data **/
+	if(options && options.debug){console.log('(1/6) Verifying basic data...');}
+	if(!hook){
+		throw new Error("Please pass a valid hook object.")
+	}
+	profile = {
+		_ubi: hook,
+		username: hook.username,
 		pfp: null,
-		siege: null,
 		games: [],
 		linked: [],
-		yearsplayed: null,
 		score: 100,
 	};
 	
-	/** Grab basic Ubisoft-provided data **/
-	let invalid = false;
-	await r6api.findByUsername('uplay',username).then((result) => {
-		if(result.length == 0){
-			invalid = true;
-		}
-		profile._ubi = result[0];
-	});
-	if(invalid){
-		console.log("Please provide a valid Uplay tag..");
-		return;
-	}
-	profile._userId = profile._ubi.userId;
-	profile.pfp = profile._ubi.avatar['256'];
-	profile.linked = (await r6api.findById('all', profile._userId, { isUserId: true })).map(i=>i.platform);
+	if(options && options.debug){console.log('(2/6) Analyzing avatar...');}
+	profile._defaultPFP = await this.hasDefaultPFP(profile._ubi);
+	
+	if(options && options.debug){console.log('(3/6) Fetching linked platforms...');}
+	profile.linked = await this.findPlatforms(profile._ubi);
+	
+	if(options && options.debug){console.log('(4/6) Fetching applications...');}
+	profile._appdata = await this.getAllApplications(profile._ubi);
+	
+	if(options && options.debug){console.log('(5/6) Fetching statistics...');}
+	profile._tabstats = await this.getStatistics(profile._ubi); 
+
+	if(options && options.debug){console.log('(6/6) Fetching linked accounts...');}
+	profile._smurfs = await this.getSmurfs(profile._ubi);	
+
+
+	/** Add PFP to return object **/
+	profile.pfp = profile._ubi.avatar['500'];
 	
 	/** Calculate score non-standard pfp **/
-	let similarity = resemble('comp.png').compareTo(profile.pfp).ignoreColors();
-	let res = await new Promise((resolve) => similarity.onComplete(resolve));
-	profile.score += res.rawMisMatchPercentage == 0 ? -10 : 1;
+	profile.score += profile._defaultPFP ? -10 : 1;
 
 	/** Calculate based on additional linked platforms **/
 	profile.score += (profile.linked.length - 1) * 10;
@@ -50,78 +137,224 @@ async function query(username, callback) {
 	profile.score += Math.max(4 - profile.username.length, -5);
 
 	/** Calculate based on owned titles **/
-	profile._appdata = (await r6api.getProfileApplications(profile._userId, { isUserId: true }))[0];
-	if(profile._appdata){
+	if (profile._appdata) {
 		profile.games = profile._appdata.applications;
 		profile.score += (profile.games.length - 2) * 10;
-	}else{
+	} else {
+		profile.autoclaimed = true;
 		profile.score -= 10;
 	}
 
 	/** Calculate based on first played **/
-	if(profile.games && profile.games.find(i => i.name == "Tom Clancy's Rainbow Six Siege")){
-		profile.siege = profile.games.find(i => i.name == "Tom Clancy's Rainbow Six Siege");
-		profile.yearsplayed = (Date.now()-Date.parse(profile.siege.firstPlayedAt))*0.0000000000317098;
+	if (profile.games && profile.games.find(i => i.name == "Tom Clancy's Rainbow Six Siege")) {
+		profile._siege = profile.games.find(i => i.name == "Tom Clancy's Rainbow Six Siege");
+		profile.yearsplayed = (Date.now() - Date.parse(profile._siege.firstPlayedAt)) * 0.0000000000317098;
 		profile.score += (profile.yearsplayed - 1) * 7.5;
+		profile.yearsplayed = (profile.yearsplayed).toFixed(2);
 	}
 
+	/** Compute based on raw KD **/
+	profile.score += ((profile._tabstats.profile.kd - 0.9) ** 3) * -50;
+
+	/** Computer based on raw HS **/
+	// can't find this for some reason
+
+	/** Computer based on KD trendline **/
+	let flattened_seasons = profile._tabstats.ranked_records
+		.map(regions=>regions[0])
+		.filter(season=>valid_seasons.includes(season.season_slug));
+	profile.kd = {
+		avg: flattened_seasons.reduce((total,new_element)=>total + new_element.kd,0)/flattened_seasons.length,
+	}
+	if(flattened_seasons.length > 3 && flattened_seasons[0].kd > 1 && flattened_seasons[0].wins + flattened_seasons[0].losses > 20){
+		// Calculate lifetime and recent slope lines for kd
+		profile.kd.recent_slope = (flattened_seasons[0].kd-flattened_seasons[1].kd)/2;
+		profile.kd.lifetime_slope = (flattened_seasons[0].kd-flattened_seasons[flattened_seasons.length-1].kd)/flattened_seasons.length;
+
+		// Calculate the difference between recent and lifetime KD slope
+		profile.kd.shift = profile.kd.lifetime_slope * 100 - profile.kd.recent_slope * 100;
+
+		// Exaggerate the difference between recent and lifetime slope and adjust score accordingly
+		profile.score += profile.kd.shift ** 3 / 50;
+
+		// Make KD more readable
+		profile.kd.avg = profile.kd.avg.toFixed(2);
+		profile.kd.recent_slope = profile.kd.recent_slope.toFixed(2);
+		profile.kd.lifetime_slope = profile.kd.lifetime_slope.toFixed(2);
+		profile.kd.shift = (profile.kd.shift > 0 ? '' : '+') + -profile.kd.shift.toFixed(2) + '%';
+	}else{
+		profile.newplayer = true;
+		profile.score -= 10;
+	}
+
+	/** Add smurfs to return object **/
+	if(profile._smurfs.length > 0){
+		profile.accounts = profile._smurfs.map(smurf=>smurf.profile.display_name);
+	}
+	
+	/** Check for banned smurfs **/
+	if(profile._smurfs.filter(smurf=>smurf.profile.is_cheater).length > 0){
+		profile.bannedaccounts = profile._smurfs.filter(smurf=>smurf.profile.is_cheater).map(smurf=>smurf.profile.display_name);
+		profile.score -= (profile.bannedaccounts.length ** 2 ) * 20;
+	}
+
+	/** Adjust for each non-banned account **/
+	if(profile.accounts > 0 && profile._smurfs.filter(smurf=>smurf.profile.is_cheater).length > 0){
+		profile.score += (profile.accounts + 1) ** 3;
+	}
+	
+	/** Check ff player has already been banned **/
+	if(profile._tabstats.profile.is_cheater){
+		profile.score -= 200;
+		profile.banned = true;
+	}
+
+	/** Check if player has been verified **/
+	if(profile._tabstats.profile.is_verified){
+		profile.score += 100;
+		profile.verified = true;
+	}
+	
 	/** Clean up and present data **/
 	delete profile._ubi;
+	delete profile._siege;
+	delete profile._smurfs;
 	delete profile._appdata;
-	delete profile._userId;
-	profile.score = Math.ceil(profile.score * 100) / 100;
-	profile.yearsplayed = Math.ceil(profile.yearsplayed * 100) / 100;
+	delete profile._tabstats;
+	delete profile._defaultPFP;
+	
+	profile.score = (profile.score).toFixed(2);
 	profile.games = profile.games.map(i => i.name == null ? "Unknown Title" : i.name);
-	console.log(profile)
-	/**
-	if (data.info.id) {
-		data.status = (await r6api.getUserStatus(data.info.id))[0];
-		data.apps = (await r6api.getProfileApplications(data.info.id, { fetchApplications: true }))[0];
-		console.log(data.apps)
-		data.ranks = (await r6api.getRanks('uplay', '0b95544b-0228-49a7-b338-6d15cfbc3d6a', { regionIds: 'ncsa', boardIds: 'pvp_ranked', seasonIds: [23, 24] }))[0];
-		console.log(data)
-		if (data.apps && data.status) {
-			score += (data.apps.applications.length - 4);
-			score += (4 - data.info.username.length);
-		
-		if (data.apps == undefined) {
-			score = "Autoclaimed Name"
-			
-		
-	data.check = await r6api.validateUsername(user);
-	if (!data.info) {
-		score = "Not taken"
-		
-	if (data.check.valid == false && data.check.validationReports[0].message !== 'NameOnPlatform is not available') {
-		score += ", invalid under Ubi naming";
-		
-	if (data.ranks.seasons) {
-		let stats = data.ranks.seasons['24'].regions.ncsa.boards.pvp_ranked;
-		console.log(stats.current)
-		
-	callback.raw(data.ranks.seasons['24'].regions.ncsa);
-	callback.score(score);
-	 catch (err) {
-	if (!err.toString().includes('429')) {
-		console.log("Name doesn't exist\n" + err)
-		 else {
-		console.log('Rate limited. FUCK')
-		
-	return -1;
-	**/
+	
+	return profile;
 };
-rl.on('line', (input) => {
-	query(input, {
-		raw: function(data) {
-			console.log(data)
-		},
-		score: function(data) {
-			if (Number.isInteger(data)) {
-				console.log('Score: ' + data)
-			} else {
-				console.log(data)
-			}
-		}
-	})
-});
+R6API.prototype.generateDetailedProfile = async function(hook) {
+	let profile = {};
+	
+	/** Grab Ubisoft and Tabstats-provided data **/
+	console.log('(1/6) Verifying basic data...');
+	if(!hook){
+		throw new Error("Please pass a valid hook object.")
+	}
+	profile = {
+		_ubi: hook,
+		username: hook.username,
+		pfp: null,
+		games: [],
+		linked: [],
+		score: 100,
+	};
+	
+	console.log('(2/6) Analyzing avatar...')
+	profile.defaultPFP = await this.hasDefaultPFP(profile._ubi);
+	
+	console.log('(3/6) Fetching linked platforms...');
+	profile.linked = await this.findPlatforms(profile._ubi);
+	
+	console.log('(4/6) Fetching applications...');
+	profile.appdata = await this.getAllApplications(profile._ubi);
+	
+	console.log('(5/6) Fetching statistics...');
+	profile.tabstats = await this.getStatistics(profile._ubi); 
 
+	console.log('(6/6) Fetching linked accounts...');
+	profile.smurfs = await this.getSmurfs(profile._ubi);	
+
+
+	/** Add PFP to return object **/
+	profile.pfp = profile._ubi.avatar['500'];
+	
+	/** Calculate score non-standard pfp **/
+	profile.score += profile._defaultPFP ? -10 : 1;
+
+	/** Calculate based on additional linked platforms **/
+	profile.score += (profile.linked.length - 1) * 10;
+
+	/** Calculate based on name **/
+	profile.score += Math.max(4 - profile.username.length, -5);
+
+	/** Calculate based on owned titles **/
+	if (profile._appdata) {
+		profile.games = profile._appdata.applications;
+		profile.score += (profile.games.length - 2) * 10;
+	} else {
+		profile.autoclaimed = true;
+		profile.score -= 10;
+	}
+
+	/** Calculate based on first played **/
+	if (profile.games && profile.games.find(i => i.name == "Tom Clancy's Rainbow Six Siege")) {
+		profile.siege = profile.games.find(i => i.name == "Tom Clancy's Rainbow Six Siege");
+		profile.yearsplayed = (Date.now() - Date.parse(profile._siege.firstPlayedAt)) * 0.0000000000317098;
+		profile.score += (profile.yearsplayed - 1) * 7.5;
+		profile.yearsplayed = (profile.yearsplayed).toFixed(2);
+	}
+
+	/** Compute based on raw KD **/
+	profile.score += ((profile.tabstats.profile.kd - 0.9) ** 3) * -50;
+
+	/** Computer based on raw HS **/
+	// can't find this for some reason
+
+	/** Computer based on KD trendline **/
+	let flattened_seasons = profile.tabstats.ranked_records
+		.map(regions=>regions[0])
+		.filter(season=>valid_seasons.includes(season.season_slug));
+	profile.kd = {
+		avg: flattened_seasons.reduce((total,new_element)=>total + new_element.kd,0)/flattened_seasons.length,
+	}
+	if(flattened_seasons.length > 3 && flattened_seasons[0].kd > 1 && flattened_seasons[0].wins + flattened_seasons[0].losses > 20){
+		// Calculate lifetime and recent slope lines for kd
+		profile.kd.recent_slope = (flattened_seasons[0].kd-flattened_seasons[1].kd)/2;
+		profile.kd.lifetime_slope = (flattened_seasons[0].kd-flattened_seasons[flattened_seasons.length-1].kd)/flattened_seasons.length;
+
+		// Calculate the difference between recent and lifetime KD slope
+		profile.kd.shift = profile.kd.lifetime_slope * 100 - profile.kd.recent_slope * 100;
+
+		// Exaggerate the difference between recent and lifetime slope and adjust score accordingly
+		profile.score += profile.kd.shift ** 3 / 50;
+
+		// Make KD more readable
+		profile.kd.avg = profile.kd.avg.toFixed(2);
+		profile.kd.recent_slope = profile.kd.recent_slope.toFixed(2);
+		profile.kd.lifetime_slope = profile.kd.lifetime_slope.toFixed(2);
+		profile.kd.shift = (profile.kd.shift > 0 ? '' : '+') + -profile.kd.shift.toFixed(2) + '%';
+	}else{
+		profile.newplayer = true;
+		profile.score -= 10;
+	}
+
+	/** Add smurfs to return object **/
+	if(profile.smurfs.length > 0){
+		profile.accounts = profile._smurfs.map(smurf=>smurf.profile.display_name);
+	}
+	
+	/** Check for banned smurfs **/
+	if(profile.smurfs.filter(smurf=>smurf.profile.is_cheater).length > 0){
+		profile.bannedaccounts = profile._smurfs.filter(smurf=>smurf.profile.is_cheater).map(smurf=>smurf.profile.display_name);
+		profile.score -= (profile.bannedaccounts.length ** 2 ) * 20;
+	}
+
+	/** Adjust for each non-banned account **/
+	if(profile.accounts > 0 && profile.smurfs.filter(smurf=>smurf.profile.is_cheater).length > 0){
+		profile.score += (profile.accounts + 1) ** 3;
+	}
+	
+	/** Check ff player has already been banned **/
+	if(profile.tabstats.profile.is_cheater){
+		profile.score -= 200;
+		profile.banned = true;
+	}
+
+	/** Check if player has been verified **/
+	if(profile.tabstats.profile.is_verified){
+		profile.score += 100;
+		profile.verified = true;
+	}
+	
+	/** Present data **/
+	return profile;
+};
+module.exports = {
+	R6API, generateAPIHook
+};
