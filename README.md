@@ -60,7 +60,7 @@ console.log(hasDefaultPFP);
 ```
 
 
-## PROFILING
+## Profiling
 ### Fetch basic stats to get a 'profile' object.
 ```
 let profile = await api.generateSimpleProfile(hook, {debug:true});
