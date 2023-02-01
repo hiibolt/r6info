@@ -1,4 +1,4 @@
-# A package which is intended for grabbing hidden details on an R6 player via the Tabstats and Ubisoft API
+# A package intended for grabbing hidden details on an R6 player via the Tabstats and Ubisoft API
 Asynchronous wrapper for both Ubisoft and Tabstats API, build with Fetch and r6api
 Due to the fact that Ubisoft's website requires auth, a Ubisoft account with email and password are required.
 
