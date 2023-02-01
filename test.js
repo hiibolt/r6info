@@ -7,8 +7,8 @@ const api = r6info.generateAPIHook({
 });
 
 async function lookup(){
-	// Get the 'hook' object forr Spoit.KOI, who plays on 'uplay'
-	let hook = await api.hookPlayer({
+	// Get the 'hook' object forr Spoit.KOI
+	let hook = await api.hookPlayerById({
 		id: 'cc3a555f-97fa-49e3-a7b4-f592d23e66fe'
 	});
 

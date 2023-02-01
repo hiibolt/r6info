@@ -14,11 +14,18 @@ const api = r6info.generateAPIHook({
 ```
 All lookup functions require a 'hook' object on a player, obtainable via
 ```
-let hook = await api.hookPlayer({
+let hook = await api.hookPlayerByName({
 	platform: 'uplay',
 	username: 'spoit.koi'
 });
 ```
+or
+```
+let hook = await api.hookPlayerById({
+	id: '<insert userId here>'
+});
+```
+
 All profiling functions require a 'profile' object, obtainable via
 ```
 api.generateSimpleProfile(hook, {debug:true});
