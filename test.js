@@ -1,16 +1,15 @@
-const r6info = require('r6info');
+const r6info = require('api.js');
 
 // Create a Ubisoft authorization
 const api = r6info.generateAPIHook({ 
-	email: "<your email here>", 
-	password: "<your password here>",
+	email: ",", 
+	password: ",",
 });
 
 async function lookup(){
 	// Get the 'hook' object forr Spoit.KOI, who plays on 'uplay'
 	let hook = await api.hookPlayer({
-		platform: 'uplay',
-		username: 'spoit.koi'
+		id: 'cc3a555f-97fa-49e3-a7b4-f592d23e66fe'
 	});
 
 	/** LOOKUP **/
